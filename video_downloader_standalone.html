@@ -116,6 +116,7 @@
     <a href="#" class="nav-link active" data-tab="downloader">🎬 Downloader</a>
     <a href="#" class="nav-link" data-tab="history">📜 History</a>
     <a href="#" class="nav-link" data-tab="queue">⏳ Download Queue</a>
+    <a href="#" class="nav-link" data-tab="supported">📋 Supported Platforms</a>
     <div class="theme-selector">
       <select id="theme-selector" class="form-select form-select-sm">
         <option value="light-theme">Light</option>
@@ -162,13 +163,27 @@
         <h2>⏳ Download Queue</h2>
         <ul id="queueList" class="list-group"></ul>
       </div>
-    </div> <!-- end of tab-content -->
-  </div> <!-- end of container -->
-<script>
+
+      <!-- Supported Platforms -->
+      <div id="supported">
+        <h2>📋 Supported Platforms</h2>
+        <p>You can download from the following platforms:</p>
+        <ul>
+          <li><strong>Video Sharing:</strong> YouTube, Vimeo, Dailymotion, Twitch, Bilibili</li>
+          <li><strong>Social Media:</strong> Facebook, Instagram, TikTok, Twitter (X), Reddit, Pinterest</li>
+          <li><strong>Audio Platforms:</strong> SoundCloud, Bandcamp</li>
+          <li><strong>Education & News:</strong> TED, NPR, Coursera, Khan Academy, Pluralsight</li>
+          <li><strong>And 1000+ More:</strong> <a href="https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md" target="_blank">See full list</a></li>
+        </ul>
+      </div>
+    </div> <!-- End of tab-content -->
+  </div> <!-- End of container -->
+
+  <script>
 const backendUrl = 'https://video-downloader-backend.up.railway.app';
 let downloadQueue = JSON.parse(localStorage.getItem('downloadQueue')) || [];
 
-// Theme switcher
+// Theme management
 const themeSelector = document.getElementById('theme-selector');
 const savedTheme = localStorage.getItem('theme') || 'light-theme';
 document.body.classList.add(savedTheme);
@@ -180,7 +195,7 @@ themeSelector.addEventListener('change', function () {
   localStorage.setItem('theme', this.value);
 });
 
-// Navigation
+// Sidebar tab switching
 document.querySelectorAll('.nav-link').forEach(tab => {
   tab.addEventListener('click', e => {
     e.preventDefault();
@@ -193,7 +208,7 @@ document.querySelectorAll('.nav-link').forEach(tab => {
   });
 });
 
-// History
+// History loader
 async function loadHistory() {
   try {
     const res = await fetch(`${backendUrl}/history`);
@@ -214,12 +229,12 @@ async function loadHistory() {
       `;
       list.appendChild(li);
     });
-  } catch (err) {
+  } catch {
     document.getElementById('historyList').innerHTML = '<li class="list-group-item text-danger">Error loading history.</li>';
   }
 }
 
-// Queue handling
+// Queue management
 function addToQueue(url, format_id, audioOnly) {
   downloadQueue.push({ url, format_id, audioOnly, status: 'Queued' });
   localStorage.setItem('downloadQueue', JSON.stringify(downloadQueue));

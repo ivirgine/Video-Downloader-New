@@ -18,6 +18,7 @@
       background-color: var(--bg-color);
       color: var(--text-color);
       padding: 2rem;
+      transition: background-color 0.4s ease, color 0.4s ease;
     }
 
     a { color: var(--link-color); }
@@ -39,12 +40,35 @@
       --button-text: #ffff00;
     }
 
-    .tab-content > div { display: none; }
+    body.solarized-theme {
+      --bg-color: #fdf6e3;
+      --text-color: #657b83;
+      --link-color: #268bd2;
+      --button-bg: #eee8d5;
+      --button-text: #586e75;
+    }
+
+    body.minimal-gray-theme {
+      --bg-color: #f4f4f4;
+      --text-color: #333;
+      --link-color: #555;
+      --button-bg: #ccc;
+      --button-text: #000;
+    }
+
+    .tab-content > div { display: none; animation: fadeIn 0.5s ease-in-out; }
     .tab-content > .active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .theme-selector {
-      position: absolute;
-      top: 1rem;
-      right: 2rem;
+      position: fixed;
+      top: 0.5rem;
+      right: 1rem;
+      z-index: 999;
     }
 
     .thumbnail {
@@ -52,17 +76,25 @@
       height: auto;
       margin-bottom: 1rem;
     }
+
+    @media (max-width: 768px) {
+      body { padding: 1rem; font-size: 1rem; }
+      h2, h4 { font-size: 1.25rem; }
+      .theme-selector select { font-size: 0.9rem; }
+    }
   </style>
 </head>
 <body>
   <div class="theme-selector">
-    <label for="theme-selector">Theme:</label>
     <select id="theme-selector" class="form-select form-select-sm">
       <option value="light-theme">Light</option>
       <option value="dark-theme">Dark</option>
       <option value="high-contrast-theme">High Contrast</option>
+      <option value="solarized-theme">Solarized</option>
+      <option value="minimal-gray-theme">Minimal Gray</option>
     </select>
   </div>
+
   <div class="container">
     <ul class="nav nav-tabs mb-4" id="navTabs">
       <li class="nav-item"><a class="nav-link active" href="#" data-tab="downloader">Downloader</a></li>
@@ -70,7 +102,6 @@
     </ul>
 
     <div class="tab-content">
-      <!-- Downloader Tab -->
       <div id="downloader" class="active">
         <h2>🎬 Video Downloader</h2>
         <div class="mb-3">
@@ -79,7 +110,6 @@
         </div>
         <button id="getInfoBtn" class="btn btn-primary mb-4">Get Info</button>
         <div id="status" class="mb-3 text-danger"></div>
-
         <div id="videoInfo" style="display: none;">
           <h4 id="videoTitle"></h4>
           <img id="videoThumbnail" class="thumbnail" src="" alt="Thumbnail"/>
@@ -91,8 +121,6 @@
           <button id="downloadBtn" class="btn btn-success">Download</button>
         </div>
       </div>
-
-      <!-- History Tab -->
       <div id="history">
         <h2>📜 Download History</h2>
         <ul id="historyList" class="list-group"></ul>
@@ -103,27 +131,26 @@
   <script>
   const backendUrl = 'https://video-downloader-backend.up.railway.app';
 
-  // Theme selector
+  // Theme logic
   const themeSelector = document.getElementById('theme-selector');
-  const currentTheme = localStorage.getItem('theme') || 'light-theme';
-  document.body.classList.add(currentTheme);
-  themeSelector.value = currentTheme;
+  const savedTheme = localStorage.getItem('theme') || 'light-theme';
+  document.body.classList.add(savedTheme);
+  themeSelector.value = savedTheme;
 
   themeSelector.addEventListener('change', function () {
-    document.body.classList.remove('light-theme', 'dark-theme', 'high-contrast-theme');
+    document.body.classList.remove('light-theme', 'dark-theme', 'high-contrast-theme', 'solarized-theme', 'minimal-gray-theme');
     document.body.classList.add(this.value);
     localStorage.setItem('theme', this.value);
   });
 
-  // Tab logic
+  // Tab switching
   document.querySelectorAll('[data-tab]').forEach(tab => {
-    tab.addEventListener('click', (e) => {
+    tab.addEventListener('click', e => {
       e.preventDefault();
       document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
       document.querySelectorAll('.tab-content > div').forEach(div => div.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById(tab.dataset.tab).classList.add('active');
-
       if (tab.dataset.tab === 'history') loadHistory();
     });
   });
@@ -138,7 +165,6 @@
         list.innerHTML = '<li class="list-group-item">No downloads yet.</li>';
         return;
       }
-
       history.forEach(item => {
         const li = document.createElement('li');
         li.className = 'list-group-item';
@@ -172,7 +198,7 @@
         body: JSON.stringify({ url })
       });
 
-      if (!response.ok) throw new Error('Info fetch failed');
+      if (!response.ok) throw new Error('Failed to fetch info');
 
       const data = await response.json();
       document.getElementById('videoTitle').textContent = data.title;

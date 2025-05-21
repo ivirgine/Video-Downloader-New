@@ -17,12 +17,9 @@
     body {
       background-color: var(--bg-color);
       color: var(--text-color);
-      padding: 2rem;
       transition: background-color 0.4s ease, color 0.4s ease;
+      padding-left: 220px;
     }
-
-    a { color: var(--link-color); }
-    button { background-color: var(--button-bg); color: var(--button-text); }
 
     body.dark-theme {
       --bg-color: #121212;
@@ -56,52 +53,83 @@
       --button-text: #000;
     }
 
-    .tab-content > div { display: none; animation: fadeIn 0.5s ease-in-out; }
-    .tab-content > .active { display: block; }
+    .sidebar {
+      height: 100vh;
+      width: 200px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background-color: #111;
+      padding-top: 1rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar a {
+      padding: 10px 20px;
+      text-decoration: none;
+      font-size: 1rem;
+      color: white;
+      display: block;
+    }
+
+    .sidebar a:hover,
+    .sidebar a.active {
+      background-color: #575757;
+    }
+
+    .theme-selector {
+      margin: 1rem 0;
+      padding: 0 20px;
+    }
+
+    .tab-content > div {
+      display: none;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    .tab-content > .active {
+      display: block;
+    }
 
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-    .theme-selector {
-      position: fixed;
-      top: 0.5rem;
-      right: 1rem;
-      z-index: 999;
-    }
-
-    .thumbnail {
-      max-width: 100%;
-      height: auto;
-      margin-bottom: 1rem;
+    .container {
+      max-width: 800px;
+      padding: 2rem;
     }
 
     @media (max-width: 768px) {
-      body { padding: 1rem; font-size: 1rem; }
-      h2, h4 { font-size: 1.25rem; }
-      .theme-selector select { font-size: 0.9rem; }
+      body { padding-left: 0; }
+      .sidebar { width: 100%; height: auto; flex-direction: row; position: relative; }
+      .sidebar a { flex: 1; text-align: center; padding: 10px; }
+      .container { padding: 1rem; }
+      .theme-selector { padding: 10px; }
     }
   </style>
 </head>
 <body>
-  <div class="theme-selector">
-    <select id="theme-selector" class="form-select form-select-sm">
-      <option value="light-theme">Light</option>
-      <option value="dark-theme">Dark</option>
-      <option value="high-contrast-theme">High Contrast</option>
-      <option value="solarized-theme">Solarized</option>
-      <option value="minimal-gray-theme">Minimal Gray</option>
-    </select>
+  <div class="sidebar">
+    <a href="#" class="nav-link active" data-tab="downloader">🎬 Downloader</a>
+    <a href="#" class="nav-link" data-tab="history">📜 History</a>
+    <a href="#" class="nav-link" data-tab="queue">⏳ Download Queue</a>
+    <div class="theme-selector">
+      <select id="theme-selector" class="form-select form-select-sm">
+        <option value="light-theme">Light</option>
+        <option value="dark-theme">Dark</option>
+        <option value="high-contrast-theme">High Contrast</option>
+        <option value="solarized-theme">Solarized</option>
+        <option value="minimal-gray-theme">Minimal Gray</option>
+      </select>
+    </div>
   </div>
 
   <div class="container">
-    <ul class="nav nav-tabs mb-4" id="navTabs">
-      <li class="nav-item"><a class="nav-link active" href="#" data-tab="downloader">Downloader</a></li>
-      <li class="nav-item"><a class="nav-link" href="#" data-tab="history">Download History</a></li>
-    </ul>
-
     <div class="tab-content">
+      <!-- Downloader -->
       <div id="downloader" class="active">
         <h2>🎬 Video Downloader</h2>
         <div class="mb-3">
@@ -110,9 +138,10 @@
         </div>
         <button id="getInfoBtn" class="btn btn-primary mb-4">Get Info</button>
         <div id="status" class="mb-3 text-danger"></div>
+
         <div id="videoInfo" style="display: none;">
           <h4 id="videoTitle"></h4>
-          <img id="videoThumbnail" class="thumbnail" src="" alt="Thumbnail"/>
+          <img id="videoThumbnail" class="img-fluid mb-3" src="" alt="Thumbnail"/>
           <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" id="audioOnly">
             <label class="form-check-label" for="audioOnly">Audio only (MP3)</label>
@@ -121,136 +150,191 @@
           <button id="downloadBtn" class="btn btn-success">Download</button>
         </div>
       </div>
+
+      <!-- History -->
       <div id="history">
         <h2>📜 Download History</h2>
         <ul id="historyList" class="list-group"></ul>
       </div>
-    </div>
-  </div>
 
-  <script>
-  const backendUrl = 'https://video-downloader-backend.up.railway.app';
+      <!-- Queue -->
+      <div id="queue">
+        <h2>⏳ Download Queue</h2>
+        <ul id="queueList" class="list-group"></ul>
+      </div>
+    </div> <!-- end of tab-content -->
+  </div> <!-- end of container -->
+<script>
+const backendUrl = 'https://video-downloader-backend.up.railway.app';
+let downloadQueue = JSON.parse(localStorage.getItem('downloadQueue')) || [];
 
-  // Theme logic
-  const themeSelector = document.getElementById('theme-selector');
-  const savedTheme = localStorage.getItem('theme') || 'light-theme';
-  document.body.classList.add(savedTheme);
-  themeSelector.value = savedTheme;
+// Theme switcher
+const themeSelector = document.getElementById('theme-selector');
+const savedTheme = localStorage.getItem('theme') || 'light-theme';
+document.body.classList.add(savedTheme);
+themeSelector.value = savedTheme;
 
-  themeSelector.addEventListener('change', function () {
-    document.body.classList.remove('light-theme', 'dark-theme', 'high-contrast-theme', 'solarized-theme', 'minimal-gray-theme');
-    document.body.classList.add(this.value);
-    localStorage.setItem('theme', this.value);
+themeSelector.addEventListener('change', function () {
+  document.body.classList.remove('light-theme', 'dark-theme', 'high-contrast-theme', 'solarized-theme', 'minimal-gray-theme');
+  document.body.classList.add(this.value);
+  localStorage.setItem('theme', this.value);
+});
+
+// Navigation
+document.querySelectorAll('.nav-link').forEach(tab => {
+  tab.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+    document.querySelectorAll('.tab-content > div').forEach(div => div.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'history') loadHistory();
+    if (tab.dataset.tab === 'queue') updateQueueUI();
   });
+});
 
-  // Tab switching
-  document.querySelectorAll('[data-tab]').forEach(tab => {
-    tab.addEventListener('click', e => {
-      e.preventDefault();
-      document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-      document.querySelectorAll('.tab-content > div').forEach(div => div.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById(tab.dataset.tab).classList.add('active');
-      if (tab.dataset.tab === 'history') loadHistory();
-    });
-  });
-
-  async function loadHistory() {
-    try {
-      const res = await fetch(`${backendUrl}/history`);
-      const history = await res.json();
-      const list = document.getElementById('historyList');
-      list.innerHTML = '';
-      if (history.length === 0) {
-        list.innerHTML = '<li class="list-group-item">No downloads yet.</li>';
-        return;
-      }
-      history.forEach(item => {
-        const li = document.createElement('li');
-        li.className = 'list-group-item';
-        li.innerHTML = `
-          <strong>${item.title || 'Unknown'}</strong><br/>
-          Format: ${item.format_id} | Audio: ${item.audio_only ? '✔' : '❌'}<br/>
-          Date: ${new Date(item.created_at).toLocaleString()}
-        `;
-        list.appendChild(li);
-      });
-    } catch (err) {
-      document.getElementById('historyList').innerHTML = '<li class="list-group-item text-danger">Error loading history.</li>';
+// History
+async function loadHistory() {
+  try {
+    const res = await fetch(`${backendUrl}/history`);
+    const history = await res.json();
+    const list = document.getElementById('historyList');
+    list.innerHTML = '';
+    if (history.length === 0) {
+      list.innerHTML = '<li class="list-group-item">No downloads found.</li>';
+      return;
     }
+    history.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item';
+      li.innerHTML = `
+        <strong>${item.title || 'Unknown'}</strong><br/>
+        Format: ${item.format_id} | Audio: ${item.audio_only ? '✔' : '❌'}<br/>
+        Date: ${new Date(item.created_at).toLocaleString()}
+      `;
+      list.appendChild(li);
+    });
+  } catch (err) {
+    document.getElementById('historyList').innerHTML = '<li class="list-group-item text-danger">Error loading history.</li>';
+  }
+}
+
+// Queue handling
+function addToQueue(url, format_id, audioOnly) {
+  downloadQueue.push({ url, format_id, audioOnly, status: 'Queued' });
+  localStorage.setItem('downloadQueue', JSON.stringify(downloadQueue));
+  updateQueueUI();
+}
+
+function updateQueueUI() {
+  const list = document.getElementById('queueList');
+  list.innerHTML = '';
+  if (downloadQueue.length === 0) {
+    list.innerHTML = '<li class="list-group-item">No queued downloads.</li>';
+    return;
+  }
+  downloadQueue.forEach((item, index) => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item';
+    li.textContent = `${item.url} — ${item.status}`;
+    list.appendChild(li);
+  });
+}
+
+function processQueue() {
+  if (!navigator.onLine) return;
+  downloadQueue.forEach((item, i) => {
+    if (item.status === 'Queued') {
+      fetch(`${backendUrl}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: item.url, format_id: item.format_id, audio_only: item.audioOnly })
+      }).then(res => res.json())
+        .then(() => {
+          downloadQueue[i].status = 'Completed';
+          localStorage.setItem('downloadQueue', JSON.stringify(downloadQueue));
+          updateQueueUI();
+        });
+    }
+  });
+}
+window.addEventListener('online', processQueue);
+
+// Downloader logic
+document.getElementById('getInfoBtn').addEventListener('click', async () => {
+  const url = document.getElementById('videoUrl').value.trim();
+  const audioOnly = document.getElementById('audioOnly').checked;
+  if (!url) {
+    document.getElementById('status').textContent = 'Please enter a video URL.';
+    return;
   }
 
-  document.getElementById('getInfoBtn').addEventListener('click', async () => {
-    const url = document.getElementById('videoUrl').value.trim();
-    const audioOnly = document.getElementById('audioOnly').checked;
-    if (!url) {
-      document.getElementById('status').textContent = 'Please enter a video URL.';
-      return;
-    }
+  document.getElementById('status').textContent = 'Fetching video info...';
+  document.getElementById('videoInfo').style.display = 'none';
 
-    document.getElementById('status').textContent = 'Fetching video info...';
-    document.getElementById('videoInfo').style.display = 'none';
+  try {
+    const response = await fetch(`${backendUrl}/info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
 
-    try {
-      const response = await fetch(`${backendUrl}/info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-      });
+    if (!response.ok) throw new Error('Info fetch failed');
+    const data = await response.json();
 
-      if (!response.ok) throw new Error('Failed to fetch info');
+    document.getElementById('videoTitle').textContent = data.title;
+    document.getElementById('videoThumbnail').src = data.thumbnail;
+    const formatOptions = document.getElementById('formatOptions');
+    formatOptions.innerHTML = '';
 
-      const data = await response.json();
-      document.getElementById('videoTitle').textContent = data.title;
-      document.getElementById('videoThumbnail').src = data.thumbnail;
-      const formatOptions = document.getElementById('formatOptions');
-      formatOptions.innerHTML = '';
+    const sorted = data.formats.filter(f => f.filesize).sort((a, b) => (b.height || 0) - (a.height || 0));
+    sorted.forEach(format => {
+      const label = `${format.ext.toUpperCase()} ${format.format_note || ''} (${(format.filesize / 1024 / 1024).toFixed(1)} MB)`;
+      const opt = document.createElement('div');
+      opt.className = 'form-check';
+      opt.innerHTML = `
+        <input class="form-check-input" type="radio" name="format" id="format${format.format_id}" value="${format.format_id}">
+        <label class="form-check-label" for="format${format.format_id}">${label}</label>
+      `;
+      formatOptions.appendChild(opt);
+    });
 
-      const sorted = data.formats.filter(f => f.filesize).sort((a, b) => (b.height || 0) - (a.height || 0));
-      sorted.forEach(format => {
-        const label = `${format.ext.toUpperCase()} ${format.format_note || ''} (${(format.filesize / 1024 / 1024).toFixed(1)} MB)`;
-        const opt = document.createElement('div');
-        opt.className = 'form-check';
-        opt.innerHTML = `
-          <input class="form-check-input" type="radio" name="format" id="format${format.format_id}" value="${format.format_id}">
-          <label class="form-check-label" for="format${format.format_id}">${label}</label>
-        `;
-        formatOptions.appendChild(opt);
-      });
+    document.getElementById('videoInfo').style.display = 'block';
+    document.getElementById('status').textContent = '';
+  } catch (err) {
+    document.getElementById('status').textContent = 'Error: ' + err.message;
+  }
+});
 
-      document.getElementById('videoInfo').style.display = 'block';
-      document.getElementById('status').textContent = '';
-    } catch (err) {
-      document.getElementById('status').textContent = 'Error: ' + err.message;
-    }
-  });
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const url = document.getElementById('videoUrl').value.trim();
+  const audioOnly = document.getElementById('audioOnly').checked;
+  const selectedFormat = document.querySelector('input[name="format"]:checked');
+  if (!selectedFormat) {
+    document.getElementById('status').textContent = 'Please select a format.';
+    return;
+  }
 
-  document.getElementById('downloadBtn').addEventListener('click', async () => {
-    const url = document.getElementById('videoUrl').value.trim();
-    const audioOnly = document.getElementById('audioOnly').checked;
-    const selectedFormat = document.querySelector('input[name="format"]:checked');
-    if (!selectedFormat) {
-      document.getElementById('status').textContent = 'Please select a format.';
-      return;
-    }
+  if (!navigator.onLine) {
+    addToQueue(url, selectedFormat.value, audioOnly);
+    document.getElementById('status').textContent = 'You’re offline. Added to queue.';
+    return;
+  }
 
-    document.getElementById('status').textContent = 'Starting download...';
+  document.getElementById('status').textContent = 'Starting download...';
 
-    try {
-      const response = await fetch(`${backendUrl}/download`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, format_id: selectedFormat.value, audio_only: audioOnly })
-      });
-
-      const result = await response.json();
+  fetch(`${backendUrl}/download`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, format_id: selectedFormat.value, audio_only: audioOnly })
+  }).then(res => res.json())
+    .then(result => {
       if (result.error) throw new Error(result.error);
-
       document.getElementById('status').textContent = '✅ Download started!';
-    } catch (err) {
+    }).catch(err => {
       document.getElementById('status').textContent = '❌ ' + err.message;
-    }
-  });
+    });
+});
 </script>
 </body>
 </html>

@@ -8,108 +8,164 @@
   <style>
     body { padding: 2rem; background-color: #f8f9fa; }
     .thumbnail { max-width: 100%; height: auto; margin-bottom: 1rem; }
-    .format-option { margin-bottom: 0.5rem; }
+    .tab-content > div { display: none; }
+    .tab-content > .active { display: block; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1 class="mb-4">🎬 Video Downloader</h1>
-    <div class="mb-3">
-      <label for="videoUrl" class="form-label">Enter Video URL:</label>
-      <input type="text" id="videoUrl" class="form-control" placeholder="https://www.youtube.com/watch?v=example"/>
-    </div>
-    <button id="getInfoBtn" class="btn btn-primary mb-4">Get Info</button>
-    <div id="status" class="mb-3 text-danger"></div>
-    <div id="videoInfo" class="mb-4" style="display: none;">
-      <h3 id="videoTitle"></h3>
-      <img id="videoThumbnail" class="thumbnail" src="" alt="Video Thumbnail"/>
-      <div id="formatOptions" class="mb-3"></div>
-      <button id="downloadBtn" class="btn btn-success">Download</button>
+    <ul class="nav nav-tabs mb-4" id="navTabs">
+      <li class="nav-item"><a class="nav-link active" href="#" data-tab="downloader">Downloader</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-tab="history">Download History</a></li>
+    </ul>
+
+    <div class="tab-content">
+      <!-- Downloader Tab -->
+      <div id="downloader" class="active">
+        <h2>🎬 Video Downloader</h2>
+        <div class="mb-3">
+          <label for="videoUrl" class="form-label">Enter Video URL:</label>
+          <input type="text" id="videoUrl" class="form-control" placeholder="https://www.youtube.com/watch?v=example"/>
+        </div>
+        <button id="getInfoBtn" class="btn btn-primary mb-4">Get Info</button>
+        <div id="status" class="mb-3 text-danger"></div>
+
+        <div id="videoInfo" style="display: none;">
+          <h4 id="videoTitle"></h4>
+          <img id="videoThumbnail" class="thumbnail" src="" alt="Thumbnail"/>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="audioOnly">
+            <label class="form-check-label" for="audioOnly">
+              Audio only (MP3)
+            </label>
+          </div>
+          <div id="formatOptions" class="mb-3"></div>
+          <button id="downloadBtn" class="btn btn-success">Download</button>
+        </div>
+      </div>
+
+      <!-- History Tab -->
+      <div id="history">
+        <h2>📜 Download History</h2>
+        <ul id="historyList" class="list-group"></ul>
+      </div>
     </div>
   </div>
+  
+<script>
+  const backendUrl = 'https://video-downloader-backend.up.railway.app';
 
-  <script>
-    const backendUrl = 'https://video-downloader-backend.up.railway.app';
+  // Tab Navigation
+  document.querySelectorAll('[data-tab]').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+      document.querySelectorAll('.tab-content > div').forEach(div => div.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
 
-    document.getElementById('getInfoBtn').addEventListener('click', async () => {
-      const url = document.getElementById('videoUrl').value.trim();
-      if (!url) {
-        document.getElementById('status').textContent = 'Please enter a video URL.';
+      if (tab.dataset.tab === 'history') loadHistory();
+    });
+  });
+
+  async function loadHistory() {
+    try {
+      const res = await fetch(`${backendUrl}/history`);
+      const history = await res.json();
+      const list = document.getElementById('historyList');
+      list.innerHTML = '';
+      if (history.length === 0) {
+        list.innerHTML = '<li class="list-group-item">No downloads found.</li>';
         return;
       }
-      document.getElementById('status').textContent = 'Fetching video information...';
-      document.getElementById('videoInfo').style.display = 'none';
 
-      try {
-        const response = await fetch(`${backendUrl}/info`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        });
+      history.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item';
+        li.innerHTML = `
+          <strong>${item.title || 'Unknown'}</strong><br/>
+          Format: ${item.format_id} | Audio: ${item.audio_only ? '✔' : '❌'}<br/>
+          Date: ${new Date(item.created_at).toLocaleString()}
+        `;
+        list.appendChild(li);
+      });
+    } catch (err) {
+      document.getElementById('historyList').innerHTML = '<li class="list-group-item text-danger">Error loading history.</li>';
+    }
+  }
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch video information.');
-        }
+  document.getElementById('getInfoBtn').addEventListener('click', async () => {
+    const url = document.getElementById('videoUrl').value.trim();
+    const audioOnly = document.getElementById('audioOnly').checked;
+    if (!url) {
+      document.getElementById('status').textContent = 'Please enter a video URL.';
+      return;
+    }
 
-        const data = await response.json();
-        document.getElementById('videoTitle').textContent = data.title;
-        document.getElementById('videoThumbnail').src = data.thumbnail;
-        const formatOptions = document.getElementById('formatOptions');
-        formatOptions.innerHTML = '';
+    document.getElementById('status').textContent = 'Fetching video information...';
+    document.getElementById('videoInfo').style.display = 'none';
 
-        data.formats.forEach(format => {
-          const option = document.createElement('div');
-          option.className = 'form-check format-option';
-          option.innerHTML = `
-            <input class="form-check-input" type="radio" name="format" id="format${format.format_id}" value="${format.format_id}">
-            <label class="form-check-label" for="format${format.format_id}">
-              ${format.format_note || 'Format'} - ${format.ext} - ${format.filesize ? (format.filesize / (1024 * 1024)).toFixed(2) + ' MB' : 'Unknown size'}
-            </label>
-          `;
-          formatOptions.appendChild(option);
-        });
+    try {
+      const response = await fetch(`${backendUrl}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
 
-        document.getElementById('videoInfo').style.display = 'block';
-        document.getElementById('status').textContent = '';
-      } catch (error) {
-        document.getElementById('status').textContent = error.message;
-      }
-    });
+      if (!response.ok) throw new Error('Failed to fetch info');
 
-    document.getElementById('downloadBtn').addEventListener('click', async () => {
-      const url = document.getElementById('videoUrl').value.trim();
-      const selectedFormat = document.querySelector('input[name="format"]:checked');
-      if (!selectedFormat) {
-        document.getElementById('status').textContent = 'Please select a format to download.';
-        return;
-      }
-      document.getElementById('status').textContent = 'Initiating download...';
+      const data = await response.json();
+      document.getElementById('videoTitle').textContent = data.title;
+      document.getElementById('videoThumbnail').src = data.thumbnail;
+      const formatOptions = document.getElementById('formatOptions');
+      formatOptions.innerHTML = '';
 
-      try {
-        const response = await fetch(`${backendUrl}/download`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url, format_id: selectedFormat.value })
-        });
+      // Group and label formats better
+      const sorted = data.formats.filter(f => f.filesize).sort((a, b) => (b.height || 0) - (a.height || 0));
+      sorted.forEach(format => {
+        const label = `${format.ext.toUpperCase()} ${format.format_note || ''} (${(format.filesize / 1024 / 1024).toFixed(1)} MB)`;
+        const opt = document.createElement('div');
+        opt.className = 'form-check';
+        opt.innerHTML = `
+          <input class="form-check-input" type="radio" name="format" id="format${format.format_id}" value="${format.format_id}">
+          <label class="form-check-label" for="format${format.format_id}">${label}</label>
+        `;
+        formatOptions.appendChild(opt);
+      });
 
-        if (!response.ok) {
-          throw new Error('Failed to initiate download.');
-        }
+      document.getElementById('videoInfo').style.display = 'block';
+      document.getElementById('status').textContent = '';
+    } catch (err) {
+      document.getElementById('status').textContent = 'Error: ' + err.message;
+    }
+  });
 
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = 'video';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(downloadUrl);
-        document.getElementById('status').textContent = 'Download started.';
-      } catch (error) {
-        document.getElementById('status').textContent = error.message;
-      }
-    });
-  </script>
+  document.getElementById('downloadBtn').addEventListener('click', async () => {
+    const url = document.getElementById('videoUrl').value.trim();
+    const audioOnly = document.getElementById('audioOnly').checked;
+    const selectedFormat = document.querySelector('input[name="format"]:checked');
+    if (!selectedFormat) {
+      document.getElementById('status').textContent = 'Please select a format.';
+      return;
+    }
+
+    document.getElementById('status').textContent = 'Requesting download...';
+
+    try {
+      const response = await fetch(`${backendUrl}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, format_id: selectedFormat.value, audio_only: audioOnly })
+      });
+
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+
+      document.getElementById('status').textContent = '✅ Download started!';
+    } catch (err) {
+      document.getElementById('status').textContent = '❌ ' + err.message;
+    }
+  });
+</script>
 </body>
 </html>
